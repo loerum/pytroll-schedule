@@ -111,6 +111,19 @@ class MapperCartopy(object):
         self._ax.set_global()
         self._ax.gridlines()
 
+    def plot_as_polygon(self, *args, **kwargs):
+        """Experimental
+        """
+        mpl.use(MPL_BACKEND)
+        from matplotlib.patches import Polygon
+        data = np.array((args[0], args[1])).T[::-1]
+        kwargs['facecolor'] = args[2].lstrip('-')
+        kwargs['edgecolor'] = kwargs.get('edgecolor', None)
+        kwargs['fill'] = kwargs.get('fill', True)
+        kwargs['alpha'] = kwargs.get('alpha', 0.4)
+        kwargs['transform'] = ccrs.Geodetic()
+        self._ax.add_patch(Polygon(data, **kwargs))
+
     def plot(self, *args, **kwargs):
         mpl.use(MPL_BACKEND)
         import matplotlib.pyplot as plt
@@ -161,6 +174,8 @@ def save_fig(pass_obj,
     if not isinstance(poly_color, (list, tuple)):
         poly_color = [poly_color]
 
+    plot_title = plot_title or str(pass_obj)
+
     mpl.use('Agg')
     import matplotlib.pyplot as plt
     plt.clf()
@@ -173,8 +188,8 @@ def save_fig(pass_obj,
         os.makedirs(directory)
     filename = os.path.join(
         directory,
-        (rise + '_' + pass_obj.satellite.name.replace(" ", "_") + '_' + pass_obj.instrument.replace("/", "-") + '_' + fall + extension))
-
+        (rise + '_' + pass_obj.satellite.name.replace(" ", "_") + '_' +
+         pass_obj.instrument.replace("/", "-") + '_' + fall + extension))
 
     pass_obj.fig = filename
     if not overwrite and os.path.exists(filename):
@@ -191,10 +206,11 @@ def save_fig(pass_obj,
                 c = '-b'
             draw(p, mapper, c)
         logger.debug("Draw: outline = <%s>", outline)
-        draw(pass_obj.boundary.contour_poly, mapper, outline)
+        draw(pass_obj.boundary.contour_poly, mapper, outline,
+             plotter=mapper.plot_as_polygon)
 
-    logger.debug("Title = %s", str(pass_obj))
-    plt.title(str(pass_obj))
+    logger.debug("Title = %s", plot_title)
+    plt.title(plot_title)
     for label in labels or []:
         plt.figtext(*label[0], **label[1])
     logger.debug("Save plot...")
@@ -228,11 +244,13 @@ def show(pass_obj,
     plt.show()
 
 
-def draw(poly, mapper, options, **more_options):
+def draw(poly, mapper, options, plotter=None, **more_options):
+    plotter = plotter or mapper.plot
+
     lons = np.rad2deg(poly.lon.take(np.arange(len(poly.lon) + 1), mode="wrap"))
     lats = np.rad2deg(poly.lat.take(np.arange(len(poly.lat) + 1), mode="wrap"))
     rx, ry = mapper(lons, lats)
-    mapper.plot(rx, ry, options, **more_options)
+    plotter(rx, ry, options, **more_options)
 
 
 def main():
